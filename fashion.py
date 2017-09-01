@@ -53,6 +53,8 @@ batch_size = 16
 patch_size = 5
 depth = 16
 num_hidden = 64
+initial_alpha = 1e-3
+alpha_decay = 0.97
 
 with graph.as_default():
 
@@ -65,6 +67,9 @@ with graph.as_default():
     tf_test_labels = tf.constant(test_labels)
 
     # Variables .
+    global_step = tf.Variable(0)
+    learning_rate = tf.train.exponential_decay(initial_alpha, global_step, 2001, alpha_decay, True)
+
     layer1_weights = tf.Variable(tf.truncated_normal([patch_size,patch_size,num_channels,depth],stddev = 0.1))
     layer1_biases = tf.Variable(tf.zeros([depth]))
 
@@ -98,7 +103,7 @@ with graph.as_default():
 
     # optimizer
 
-    optimizer = tf.train.GradientDescentOptimizer(1e-3).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=global_step)
 
     # predictions .
     train_predictions = tf.nn.softmax(model(tf_train_data))
@@ -126,8 +131,8 @@ with tf.Session(graph=graph) as session:
         _,l,predictions = session.run([optimizer,loss,train_predictions],feed_dict=feed_dict)
         if step % 100 == 0:
             print('...............................................')
-            print('Train loss at step %d : %f' % (step,l))
-            print('Train accuracy: %.1f%%' % accuracy(predictions,batch_labels))
+            print('Minibatch Train loss at step %d : %f' % (step,l))
+            print('Minibatch Train accuracy: %.1f%%' % accuracy(predictions,batch_labels))
 
     print('***************')
     print('Test accuracy: %.1f%%' % accuracy(test_predictions.eval(), test_labels))
