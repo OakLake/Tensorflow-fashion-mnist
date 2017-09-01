@@ -22,11 +22,14 @@ print('Data loading complete.')
 image_size = 28
 num_channels = 1
 
-train_images = train_images.reshape(-1,image_size,image_size,num_channels)
-test_images = test_images.reshape(-1,image_size,image_size,num_channels)
+train_images = train_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
+test_images = test_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 
 train_labels = train_labels.reshape(-1,1)
 test_labels = test_labels.reshape(-1,1)
+
+# train_labels = tf.one_hot(train_labels,10)
+# test_labels = tf.one_hot(test_labels,10)
 
 print('Train dataset',train_images.shape)
 print('Train labels',train_labels.shape)
@@ -34,8 +37,8 @@ print('Train labels',train_labels.shape)
 print('Test dataset',test_images.shape)
 print('Test labels',test_labels.shape)
 
-plt.imshow(train_images[0].reshape(28,28) ,cmap='gray')
-plt.show()
+# plt.imshow(train_images[0].reshape(28,28) ,cmap='gray')
+# plt.show()
 
 
 # TensorFlow - CNN
@@ -59,13 +62,13 @@ with graph.as_default():
     layer1_biases = tf.Variable(tf.zeros([depth]))
 
     layer2_weights = tf.Variable(tf.truncated_normal([patch_size,patch_size,depth,depth],stddev = 0.1))
-    layer2_biases = tf.Variable(tf.constant(1.,[depth]))
+    layer2_biases = tf.Variable(tf.constant(1.,shape=[depth]))
 
     layer3_weights = tf.Variable(tf.truncated_normal([image_size//4 * image_size//4 * depth,num_hidden],stddev = 0.1))
-    layer3_biases = tf.Variable(tf.constant(1.,[num_hidden]))
+    layer3_biases = tf.Variable(tf.constant(1.,shape=[num_hidden]))
 
     layer4_weights = tf.Variable(tf.truncated_normal([num_hidden,num_labels],stddev=0.1))
-    layer4_biases = tf.Variable(tf.constant(1.,[num_labels]))
+    layer4_biases = tf.Variable(tf.constant(1.,shape=[num_labels]))
 
 
     # Model .
@@ -76,7 +79,7 @@ with graph.as_default():
         hidden = tf.nn.relu(conv + layer2_biases)
 
         shape = hidden.get_shape().as_list()
-        reshape = tf.reshape(hidden,shape[0],shape[1]*shape[2]*shape[3])
+        reshape = tf.reshape(hidden,[shape[0],shape[1]*shape[2]*shape[3]])
 
         hidden = tf.nn.relu(tf.matmul(reshape,layer3_weights) + layer3_biases)
         return tf.matmul(hidden,layer4_weights) + layer4_biases
@@ -84,10 +87,37 @@ with graph.as_default():
     logits = model(tf_train_data)
 
     # loss .
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf_train_labels,logits = logits))
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf.one_hot(tf_train_labels,num_labels),logits = logits))
 
     # optimizer
 
-    optimizer = tf.GradientDescentOptimizer(0.5).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
 
     # predictions .
+    train_predictions = tf.nn.softmax(model(tf_train_data))
+    test_predictions = tf.nn.softmax(model(tf_test_data))
+
+
+def accuracy(predictions, labels):
+    return tf.metrics.accuracy(labels,predictions)
+  #return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))/ predictions.shape[0])
+
+num_steps = 2001
+
+with tf.Session(graph=graph) as session:
+    tf.global_variables_initializer().run()
+    print('\n\nInitialized\n\n')
+
+    for step in range(num_steps):
+        _,l,predictions = session.run([optimizer,loss,train_predictions])
+        if step % 100 == 0:
+            print('Train loss at step %d : %f' % (step,l))
+            print('Train accuracy: %.1f%%' % accuracy(predictions,tf.one_hot(train_labels,10)))
+
+
+
+
+
+
+
+# eop
