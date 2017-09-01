@@ -21,12 +21,16 @@ print('Data loading complete.')
 # reshaping data
 image_size = 28
 num_channels = 1
+num_labels = 10
+
 
 train_images = train_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 test_images = test_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 
-train_labels = train_labels.reshape(-1,1)
-test_labels = test_labels.reshape(-1,1)
+train_labels = (np.arange(num_labels) == train_labels[:,None]).astype(np.float32)
+#train_labels.reshape(-1,1)
+test_labels = (np.arange(num_labels) == test_labels[:,None]).astype(np.float32)
+#test_labels.reshape(-1,1)
 
 # train_labels = tf.one_hot(train_labels,10)
 # test_labels = tf.one_hot(test_labels,10)
@@ -37,6 +41,7 @@ print('Train labels',train_labels.shape)
 print('Test dataset',test_images.shape)
 print('Test labels',test_labels.shape)
 
+
 # plt.imshow(train_images[0].reshape(28,28) ,cmap='gray')
 # plt.show()
 
@@ -44,16 +49,18 @@ print('Test labels',test_labels.shape)
 # TensorFlow - CNN
 graph = tf.Graph()
 
+batch_size = 16
 patch_size = 5
 depth = 16
 num_hidden = 64
-num_labels = 10
 
 with graph.as_default():
 
     # Input data .
-    tf_train_data = tf.constant(train_images)
-    tf_train_labels = tf.constant(train_labels)
+    tf_train_data = tf.placeholder(tf.float32,shape=[batch_size,image_size,image_size,num_channels])
+    #tf.constant(train_images)
+    tf_train_labels = tf.placeholder(tf.float32,shape=[batch_size,num_labels])
+    #tf.constant(train_labels)
     tf_test_data = tf.constant(test_images)
     tf_test_labels = tf.constant(test_labels)
 
@@ -62,13 +69,13 @@ with graph.as_default():
     layer1_biases = tf.Variable(tf.zeros([depth]))
 
     layer2_weights = tf.Variable(tf.truncated_normal([patch_size,patch_size,depth,depth],stddev = 0.1))
-    layer2_biases = tf.Variable(tf.constant(1.,shape=[depth]))
+    layer2_biases = tf.Variable(tf.constant(1.0,shape=[depth]))
 
     layer3_weights = tf.Variable(tf.truncated_normal([image_size//4 * image_size//4 * depth,num_hidden],stddev = 0.1))
-    layer3_biases = tf.Variable(tf.constant(1.,shape=[num_hidden]))
+    layer3_biases = tf.Variable(tf.constant(1.0,shape=[num_hidden]))
 
     layer4_weights = tf.Variable(tf.truncated_normal([num_hidden,num_labels],stddev=0.1))
-    layer4_biases = tf.Variable(tf.constant(1.,shape=[num_labels]))
+    layer4_biases = tf.Variable(tf.constant(1.0,shape=[num_labels]))
 
 
     # Model .
@@ -87,11 +94,11 @@ with graph.as_default():
     logits = model(tf_train_data)
 
     # loss .
-    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf.one_hot(tf_train_labels,num_labels),logits = logits))
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf_train_labels,logits = logits))
 
     # optimizer
 
-    optimizer = tf.train.GradientDescentOptimizer(0.5).minimize(loss)
+    optimizer = tf.train.GradientDescentOptimizer(1e-3).minimize(loss)
 
     # predictions .
     train_predictions = tf.nn.softmax(model(tf_train_data))
@@ -99,8 +106,8 @@ with graph.as_default():
 
 
 def accuracy(predictions, labels):
-    return tf.metrics.accuracy(labels,predictions)
-  #return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))/ predictions.shape[0])
+    # return tf.metrics.accuracy(labels,predictions)
+    return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))/ predictions.shape[0])
 
 num_steps = 2001
 
@@ -109,10 +116,21 @@ with tf.Session(graph=graph) as session:
     print('\n\nInitialized\n\n')
 
     for step in range(num_steps):
-        _,l,predictions = session.run([optimizer,loss,train_predictions])
+        # print('step: ',step)
+
+        offset = (step * batch_size) % (train_labels.shape[0] - batch_size)
+        batch_data = train_images[offset:(offset + batch_size), :, :, :]
+        batch_labels = train_labels[offset:(offset + batch_size), :]
+        feed_dict = {tf_train_data : batch_data, tf_train_labels : batch_labels}
+
+        _,l,predictions = session.run([optimizer,loss,train_predictions],feed_dict=feed_dict)
         if step % 100 == 0:
+            print('...............................................')
             print('Train loss at step %d : %f' % (step,l))
-            print('Train accuracy: %.1f%%' % accuracy(predictions,tf.one_hot(train_labels,10)))
+            print('Train accuracy: %.1f%%' % accuracy(predictions,batch_labels))
+
+    print('***************')
+    print('Test accuracy: %.1f%%' % accuracy(test_predictions.eval(), test_labels))
 
 
 
