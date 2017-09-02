@@ -14,37 +14,49 @@ print('Library import complete.')
 # loading the data
 path = './data/fashion'
 train_images,train_labels = load_mnist(path, kind='train')
-test_images,test_labels = load_mnist(path, kind='t10k')
+test_images_orig,test_labels_orig = load_mnist(path, kind='t10k')
+
+# defining category dictionary
+cat_dict = {0:'T-shirt/Top',1:'Trouser',2:'Pullover',3:'Dress',4:'Coat',5:'Sandal',6:'Shirt',7:'Sneaker',8:'Bag',9:'Ankle Boot'}
+
+# splitting t10k into validation and test sets 5k each
+test_images = test_images_orig[:5000]
+test_labels = test_labels_orig[:5000]
+valid_images = test_images_orig[5000:]
+valid_labels = test_labels_orig[5000:]
 
 print('Data loading complete.')
 
-# reshaping data
+# values
 image_size = 28
 num_channels = 1
 num_labels = 10
 
 
+# reshapign for tf
 train_images = train_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
+valid_images = valid_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 test_images = test_images.reshape(-1,image_size,image_size,num_channels).astype(np.float32)
 
+# one hot encoding
 train_labels = (np.arange(num_labels) == train_labels[:,None]).astype(np.float32)
-#train_labels.reshape(-1,1)
+valid_labels = (np.arange(num_labels) == valid_labels[:,None]).astype(np.float32)
 test_labels = (np.arange(num_labels) == test_labels[:,None]).astype(np.float32)
-#test_labels.reshape(-1,1)
 
-# train_labels = tf.one_hot(train_labels,10)
-# test_labels = tf.one_hot(test_labels,10)
-
+# printing sizes for check
 print('Train dataset',train_images.shape)
 print('Train labels',train_labels.shape)
-
+print('Valid dataset',valid_images.shape)
+print('Valid labels',valid_labels.shape)
 print('Test dataset',test_images.shape)
 print('Test labels',test_labels.shape)
 
-
-# plt.imshow(train_images[0].reshape(28,28) ,cmap='gray')
-# plt.show()
-
+# show random image from training set
+r_ix = np.random.randint(6e3)
+label = np.argwhere(train_labels[r_ix] == 1.)[0][0]
+print('item is: ',cat_dict[label])
+plt.imshow(train_images[r_ix].reshape(28,28) ,cmap='gray')
+plt.show()
 
 # TensorFlow - CNN
 graph = tf.Graph()
@@ -60,11 +72,14 @@ with graph.as_default():
 
     # Input data .
     tf_train_data = tf.placeholder(tf.float32,shape=[batch_size,image_size,image_size,num_channels])
-    #tf.constant(train_images)
     tf_train_labels = tf.placeholder(tf.float32,shape=[batch_size,num_labels])
-    #tf.constant(train_labels)
+
+    tf_valid_data = tf.constant(valid_images)
+    # tf_valid_labels = tf.constant(valid_labels)
+
     tf_test_data = tf.constant(test_images)
-    tf_test_labels = tf.constant(test_labels)
+    # tf_test_labels = tf.constant(test_labels)
+
 
     # Variables .
     global_step = tf.Variable(0)
@@ -101,12 +116,13 @@ with graph.as_default():
     # loss .
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels = tf_train_labels,logits = logits))
 
-    # optimizer
+    # optimizermax
 
     optimizer = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss, global_step=global_step)
 
     # predictions .
     train_predictions = tf.nn.softmax(model(tf_train_data))
+    valid_predictions = tf.nn.softmax(model(tf_valid_data))
     test_predictions = tf.nn.softmax(model(tf_test_data))
 
 
@@ -114,7 +130,7 @@ def accuracy(predictions, labels):
     # return tf.metrics.accuracy(labels,predictions)
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))/ predictions.shape[0])
 
-num_steps = 2001
+num_steps = 30001
 
 with tf.Session(graph=graph) as session:
     tf.global_variables_initializer().run()
@@ -133,7 +149,7 @@ with tf.Session(graph=graph) as session:
             print('...............................................')
             print('Minibatch Train loss at step %d : %f' % (step,l))
             print('Minibatch Train accuracy: %.1f%%' % accuracy(predictions,batch_labels))
-
+            print('_________ Valid accuracy: %.1f%% v' % accuracy(valid_predictions.eval(),valid_labels))
     print('***************')
     print('Test accuracy: %.1f%%' % accuracy(test_predictions.eval(), test_labels))
 
