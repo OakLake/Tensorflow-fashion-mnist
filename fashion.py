@@ -185,7 +185,7 @@ with tf.Session(graph=graph) as session:
             print('Minibatch Train accuracy: %.1f%%' % accuracy(predictions,batch_labels))
             print('_________ Valid accuracy: %.1f%% v' % accuracy(valid_predictions.eval(),valid_labels))
     print('***************')
-    print('Train accuracy: %.1f%%' % accuracy(train_predictions.eval(), train_labels))
+    #print('Train accuracy: %.1f%%' % accuracy(train_predictions.eval(), train_labels)) # invalid batch(data) shape without the code inside the for loop
     print('Valid accuracy: %.1f%%' % accuracy(valid_predictions.eval(), valid_labels))
     print('Test accuracy: %.1f%%' % accuracy(test_predictions.eval(), test_labels))
 
