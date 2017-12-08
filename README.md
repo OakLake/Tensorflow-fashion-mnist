@@ -1,4 +1,4 @@
-# tensorflow-fashion-mnist
+# Tensorflow-fashion-mnist
 Getting to know DL better with practice using the fashion-MNIST dataset.
 More compute needed, results are not record breaking but it works !
 
